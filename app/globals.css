@@ -1,9 +1,79 @@
 @import "tailwindcss";
 
+:root {
+  --font-sans: var(--font-manrope);
+  --font-mono: var(--font-ibm-plex-mono);
+}
+
 * {
   box-sizing: border-box;
 }
 
 body {
   margin: 0;
+  min-height: 100vh;
+  font-family: var(--font-sans), "Segoe UI", sans-serif;
+  color: #0f172a;
+}
+
+code,
+pre {
+  font-family: var(--font-mono), "SFMono-Regular", ui-monospace, monospace;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+.route-transition {
+  animation: route-fade-in 180ms ease-out;
+}
+
+.page-enter {
+  animation: page-rise-in 220ms ease-out;
+}
+
+.page-exit {
+  animation: page-fade-out 170ms ease-in forwards;
+}
+
+@keyframes route-fade-in {
+  from {
+    opacity: 0.35;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes page-rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes page-fade-out {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0.7;
+    transform: translateY(-4px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .route-transition,
+  .page-enter {
+    animation: none;
+  }
 }
