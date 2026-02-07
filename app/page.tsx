@@ -221,42 +221,34 @@ export default function Home() {
           </button>
         </div>
       ) : (
-        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
-          <div className="grid grid-cols-[2fr_1.2fr_1fr_1fr_1.3fr_1.1fr] gap-3 border-b border-slate-200 bg-slate-50 px-4 py-3 text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
-            <span>Release</span>
-            <span>Date Window</span>
-            <span>Status</span>
-            <span>Counts</span>
-            <span>Updated</span>
-            <span>Actions</span>
-          </div>
-
-          <div>
+        <>
+          <div className="space-y-3 md:hidden">
             {orderedReleases.map((release) => {
               const stats = getReleaseStats(release);
 
               return (
-                <div
+                <article
                   key={release.id}
-                  className="grid grid-cols-[2fr_1.2fr_1fr_1fr_1.3fr_1.1fr] items-center gap-3 border-b border-slate-100 px-4 py-4 text-sm last:border-b-0"
+                  className="rounded-2xl border border-slate-200 bg-white p-4"
                 >
-                  <div className="min-w-0">
-                    <p className="truncate font-semibold text-slate-900">{release.name}</p>
-                    <p className="truncate text-xs text-slate-500">{release.versionLabel}</p>
-                  </div>
-                  <p className="text-slate-700">{formatDateWindow(release.dateStart, release.dateEnd)}</p>
-                  <div>
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <p className="text-base font-semibold text-slate-900">{release.name}</p>
+                      <p className="text-xs text-slate-500">{release.versionLabel}</p>
+                    </div>
                     <ReleaseStatusBadge status={release.status} />
                   </div>
-                  <p className="text-xs text-slate-600">
-                    {stats.totalChanges} changes
-                    <br />
-                    {stats.breakingCount} breaking
-                    <br />
+                  <p className="mt-3 text-sm text-slate-700">
+                    {formatDateWindow(release.dateStart, release.dateEnd)}
+                  </p>
+                  <p className="mt-2 text-xs text-slate-600">
+                    {stats.totalChanges} changes · {stats.breakingCount} breaking ·{" "}
                     {stats.highRiskCount} high risk
                   </p>
-                  <p className="text-slate-600">{formatRelativeTime(release.updatedAt)}</p>
-                  <div className="flex items-center gap-2">
+                  <p className="mt-1 text-xs text-slate-500">
+                    Updated {formatRelativeTime(release.updatedAt)}
+                  </p>
+                  <div className="mt-4 flex items-center gap-2">
                     <button
                       type="button"
                       onClick={() => handleDuplicateRelease(release.id)}
@@ -274,11 +266,72 @@ export default function Home() {
                       Open
                     </button>
                   </div>
-                </div>
+                </article>
               );
             })}
           </div>
-        </div>
+
+          <div className="hidden overflow-hidden rounded-2xl border border-slate-200 bg-white md:block">
+            <div className="grid grid-cols-[2fr_1.2fr_1fr_1fr_1.3fr_1.1fr] gap-3 border-b border-slate-200 bg-slate-50 px-4 py-3 text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
+              <span>Release</span>
+              <span>Date Window</span>
+              <span>Status</span>
+              <span>Counts</span>
+              <span>Updated</span>
+              <span>Actions</span>
+            </div>
+
+            <div>
+              {orderedReleases.map((release) => {
+                const stats = getReleaseStats(release);
+
+                return (
+                  <div
+                    key={release.id}
+                    className="grid grid-cols-[2fr_1.2fr_1fr_1fr_1.3fr_1.1fr] items-center gap-3 border-b border-slate-100 px-4 py-4 text-sm last:border-b-0"
+                  >
+                    <div className="min-w-0">
+                      <p className="truncate font-semibold text-slate-900">{release.name}</p>
+                      <p className="truncate text-xs text-slate-500">{release.versionLabel}</p>
+                    </div>
+                    <p className="text-slate-700">
+                      {formatDateWindow(release.dateStart, release.dateEnd)}
+                    </p>
+                    <div>
+                      <ReleaseStatusBadge status={release.status} />
+                    </div>
+                    <p className="text-xs text-slate-600">
+                      {stats.totalChanges} changes
+                      <br />
+                      {stats.breakingCount} breaking
+                      <br />
+                      {stats.highRiskCount} high risk
+                    </p>
+                    <p className="text-slate-600">{formatRelativeTime(release.updatedAt)}</p>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => handleDuplicateRelease(release.id)}
+                        disabled={Boolean(openingReleaseId)}
+                        className="rounded-lg border border-slate-300 px-2.5 py-1 text-xs font-medium text-slate-700 transition hover:bg-slate-50"
+                      >
+                        Duplicate
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleOpenRelease(release.id)}
+                        disabled={Boolean(openingReleaseId)}
+                        className="rounded-lg bg-slate-900 px-2.5 py-1 text-xs font-medium text-white transition hover:bg-slate-700"
+                      >
+                        Open
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </>
       )}
 
       {showOpeningOverlay ? (

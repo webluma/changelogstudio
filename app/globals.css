@@ -73,7 +73,8 @@ textarea {
 
 @media (prefers-reduced-motion: reduce) {
   .route-transition,
-  .page-enter {
+  .page-enter,
+  .page-exit {
     animation: none;
   }
 }
