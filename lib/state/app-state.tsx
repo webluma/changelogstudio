@@ -10,8 +10,12 @@ import {
 } from "react";
 import { createEmptyDatabase } from "@/lib/domain/defaults";
 import type {
+  Audience,
   AppDatabase,
   AuditEvent,
+  ChangeItem,
+  ChangeRisk,
+  ChangeType,
   Release,
   ReleaseStatus,
 } from "@/lib/domain/types";
@@ -25,6 +29,34 @@ interface CreateReleaseInput {
   dateEnd?: string;
 }
 
+interface CreateChangeInput {
+  title: string;
+  description: string;
+  type: ChangeType;
+  scope: string;
+  audiences: Audience[];
+  risk: ChangeRisk;
+  isBreaking: boolean;
+  migrationNotes?: string;
+  links?: ChangeItem["links"];
+  customerImpact?: string;
+  supportNotes?: string;
+}
+
+interface UpdateChangeInput {
+  title?: string;
+  description?: string;
+  type?: ChangeType;
+  scope?: string;
+  audiences?: Audience[];
+  risk?: ChangeRisk;
+  isBreaking?: boolean;
+  migrationNotes?: string;
+  links?: ChangeItem["links"];
+  customerImpact?: string;
+  supportNotes?: string;
+}
+
 interface AppStateValue {
   isHydrated: boolean;
   storageError?: string;
@@ -33,6 +65,23 @@ interface AppStateValue {
   createRelease: (input: CreateReleaseInput) => string;
   duplicateRelease: (releaseId: string) => string | null;
   setReleaseStatus: (releaseId: string, status: ReleaseStatus) => void;
+  addChange: (releaseId: string, input: CreateChangeInput) => string | null;
+  updateChange: (
+    releaseId: string,
+    changeId: string,
+    updates: UpdateChangeInput,
+  ) => boolean;
+  bulkSetChangeScope: (
+    releaseId: string,
+    changeIds: string[],
+    scope: string,
+  ) => number;
+  bulkSetChangeRisk: (
+    releaseId: string,
+    changeIds: string[],
+    risk: ChangeRisk,
+  ) => number;
+  bulkDeleteChanges: (releaseId: string, changeIds: string[]) => number;
   getReleaseById: (releaseId: string) => Release | undefined;
   logReleaseViewed: (releaseId: string) => void;
 }
@@ -68,6 +117,39 @@ type AppAction =
   | {
       type: "add_audit_event";
       event: AuditEvent;
+    }
+  | {
+      type: "add_change";
+      releaseId: string;
+      change: ChangeItem;
+      event: AuditEvent;
+    }
+  | {
+      type: "update_change";
+      releaseId: string;
+      changeId: string;
+      updates: UpdateChangeInput;
+      event: AuditEvent;
+    }
+  | {
+      type: "bulk_set_change_scope";
+      releaseId: string;
+      changeIds: string[];
+      scope: string;
+      event: AuditEvent;
+    }
+  | {
+      type: "bulk_set_change_risk";
+      releaseId: string;
+      changeIds: string[];
+      risk: ChangeRisk;
+      event: AuditEvent;
+    }
+  | {
+      type: "bulk_delete_changes";
+      releaseId: string;
+      changeIds: string[];
+      event: AuditEvent;
     };
 
 const AppStateContext = createContext<AppStateValue | null>(null);
@@ -79,6 +161,8 @@ const INITIAL_STATE: AppState = {
 };
 
 function appStateReducer(state: AppState, action: AppAction): AppState {
+  const now = new Date().toISOString();
+
   switch (action.type) {
     case "hydrate":
       return {
@@ -103,10 +187,121 @@ function appStateReducer(state: AppState, action: AppAction): AppState {
           ...state.database,
           releases: state.database.releases.map((release) =>
             release.id === action.releaseId
+                ? {
+                    ...release,
+                    status: action.status,
+                    updatedAt: now,
+                  }
+              : release,
+          ),
+          auditLog: [action.event, ...state.database.auditLog],
+        },
+      };
+    case "add_change":
+      return {
+        ...state,
+        database: {
+          ...state.database,
+          releases: state.database.releases.map((release) =>
+            release.id === action.releaseId
               ? {
                   ...release,
-                  status: action.status,
-                  updatedAt: new Date().toISOString(),
+                  changes: [action.change, ...release.changes],
+                  updatedAt: now,
+                }
+              : release,
+          ),
+          auditLog: [action.event, ...state.database.auditLog],
+        },
+      };
+    case "update_change":
+      return {
+        ...state,
+        database: {
+          ...state.database,
+          releases: state.database.releases.map((release) =>
+            release.id === action.releaseId
+              ? {
+                  ...release,
+                  changes: release.changes.map((change) =>
+                    change.id === action.changeId
+                      ? {
+                          ...change,
+                          ...action.updates,
+                          updatedAt: now,
+                        }
+                      : change,
+                  ),
+                  updatedAt: now,
+                }
+              : release,
+          ),
+          auditLog: [action.event, ...state.database.auditLog],
+        },
+      };
+    case "bulk_set_change_scope":
+      return {
+        ...state,
+        database: {
+          ...state.database,
+          releases: state.database.releases.map((release) =>
+            release.id === action.releaseId
+              ? {
+                  ...release,
+                  changes: release.changes.map((change) =>
+                    action.changeIds.includes(change.id)
+                      ? {
+                          ...change,
+                          scope: action.scope,
+                          updatedAt: now,
+                        }
+                      : change,
+                  ),
+                  updatedAt: now,
+                }
+              : release,
+          ),
+          auditLog: [action.event, ...state.database.auditLog],
+        },
+      };
+    case "bulk_set_change_risk":
+      return {
+        ...state,
+        database: {
+          ...state.database,
+          releases: state.database.releases.map((release) =>
+            release.id === action.releaseId
+              ? {
+                  ...release,
+                  changes: release.changes.map((change) =>
+                    action.changeIds.includes(change.id)
+                      ? {
+                          ...change,
+                          risk: action.risk,
+                          updatedAt: now,
+                        }
+                      : change,
+                  ),
+                  updatedAt: now,
+                }
+              : release,
+          ),
+          auditLog: [action.event, ...state.database.auditLog],
+        },
+      };
+    case "bulk_delete_changes":
+      return {
+        ...state,
+        database: {
+          ...state.database,
+          releases: state.database.releases.map((release) =>
+            release.id === action.releaseId
+              ? {
+                  ...release,
+                  changes: release.changes.filter(
+                    (change) => !action.changeIds.includes(change.id),
+                  ),
+                  updatedAt: now,
                 }
               : release,
           ),
@@ -154,6 +349,26 @@ function buildRelease(input: CreateReleaseInput): Release {
     status: "draft",
     changes: [],
     drafts: [],
+    createdAt: now,
+    updatedAt: now,
+  };
+}
+
+function buildChange(input: CreateChangeInput): ChangeItem {
+  const now = new Date().toISOString();
+  return {
+    id: createId("chg"),
+    title: input.title,
+    description: input.description,
+    type: input.type,
+    scope: input.scope,
+    audiences: input.audiences,
+    risk: input.risk,
+    isBreaking: input.isBreaking,
+    migrationNotes: input.migrationNotes,
+    links: input.links ?? [],
+    customerImpact: input.customerImpact,
+    supportNotes: input.supportNotes,
     createdAt: now,
     updatedAt: now,
   };
@@ -260,6 +475,170 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
     });
   }, []);
 
+  const addChange = useCallback(
+    (releaseId: string, input: CreateChangeInput) => {
+      const release = state.database.releases.find((item) => item.id === releaseId);
+      if (!release) {
+        return null;
+      }
+
+      const change = buildChange(input);
+      const event = createAuditEvent({
+        event: "change.added",
+        releaseId,
+        entityId: change.id,
+        metadata: { type: change.type, risk: change.risk },
+      });
+
+      dispatch({
+        type: "add_change",
+        releaseId,
+        change,
+        event,
+      });
+
+      return change.id;
+    },
+    [state.database.releases],
+  );
+
+  const updateChange = useCallback(
+    (releaseId: string, changeId: string, updates: UpdateChangeInput) => {
+      const release = state.database.releases.find((item) => item.id === releaseId);
+      const change = release?.changes.find((item) => item.id === changeId);
+      if (!release || !change) {
+        return false;
+      }
+
+      const event = createAuditEvent({
+        event: "change.updated",
+        releaseId,
+        entityId: changeId,
+      });
+
+      dispatch({
+        type: "update_change",
+        releaseId,
+        changeId,
+        updates,
+        event,
+      });
+
+      return true;
+    },
+    [state.database.releases],
+  );
+
+  const bulkSetChangeScope = useCallback(
+    (releaseId: string, changeIds: string[], scope: string) => {
+      if (changeIds.length === 0) {
+        return 0;
+      }
+
+      const release = state.database.releases.find((item) => item.id === releaseId);
+      if (!release) {
+        return 0;
+      }
+
+      const existingCount = release.changes.filter((change) =>
+        changeIds.includes(change.id),
+      ).length;
+      if (existingCount === 0) {
+        return 0;
+      }
+
+      const event = createAuditEvent({
+        event: "change.scope_tagged",
+        releaseId,
+        metadata: { scope, count: existingCount },
+      });
+
+      dispatch({
+        type: "bulk_set_change_scope",
+        releaseId,
+        changeIds,
+        scope,
+        event,
+      });
+
+      return existingCount;
+    },
+    [state.database.releases],
+  );
+
+  const bulkSetChangeRisk = useCallback(
+    (releaseId: string, changeIds: string[], risk: ChangeRisk) => {
+      if (changeIds.length === 0) {
+        return 0;
+      }
+
+      const release = state.database.releases.find((item) => item.id === releaseId);
+      if (!release) {
+        return 0;
+      }
+
+      const existingCount = release.changes.filter((change) =>
+        changeIds.includes(change.id),
+      ).length;
+      if (existingCount === 0) {
+        return 0;
+      }
+
+      const event = createAuditEvent({
+        event: "change.risk_updated",
+        releaseId,
+        metadata: { risk, count: existingCount },
+      });
+
+      dispatch({
+        type: "bulk_set_change_risk",
+        releaseId,
+        changeIds,
+        risk,
+        event,
+      });
+
+      return existingCount;
+    },
+    [state.database.releases],
+  );
+
+  const bulkDeleteChanges = useCallback(
+    (releaseId: string, changeIds: string[]) => {
+      if (changeIds.length === 0) {
+        return 0;
+      }
+
+      const release = state.database.releases.find((item) => item.id === releaseId);
+      if (!release) {
+        return 0;
+      }
+
+      const existingCount = release.changes.filter((change) =>
+        changeIds.includes(change.id),
+      ).length;
+      if (existingCount === 0) {
+        return 0;
+      }
+
+      const event = createAuditEvent({
+        event: "change.bulk_deleted",
+        releaseId,
+        metadata: { count: existingCount },
+      });
+
+      dispatch({
+        type: "bulk_delete_changes",
+        releaseId,
+        changeIds,
+        event,
+      });
+
+      return existingCount;
+    },
+    [state.database.releases],
+  );
+
   const getReleaseById = useCallback(
     (releaseId: string) => {
       return state.database.releases.find((release) => release.id === releaseId);
@@ -289,10 +668,19 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
       createRelease,
       duplicateRelease,
       setReleaseStatus,
+      addChange,
+      updateChange,
+      bulkSetChangeScope,
+      bulkSetChangeRisk,
+      bulkDeleteChanges,
       getReleaseById,
       logReleaseViewed,
     };
   }, [
+    addChange,
+    bulkDeleteChanges,
+    bulkSetChangeRisk,
+    bulkSetChangeScope,
     createRelease,
     duplicateRelease,
     getReleaseById,
@@ -302,6 +690,7 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
     state.database.releases,
     state.isHydrated,
     state.storageError,
+    updateChange,
   ]);
 
   return <AppStateContext.Provider value={value}>{children}</AppStateContext.Provider>;

@@ -28,7 +28,13 @@ export type AuditEventName =
   | "release.created"
   | "release.duplicated"
   | "release.status_changed"
-  | "release.viewed";
+  | "release.viewed"
+  | "change.added"
+  | "change.updated"
+  | "change.deleted"
+  | "change.scope_tagged"
+  | "change.risk_updated"
+  | "change.bulk_deleted";
 
 export interface ChangeLink {
   label: string;

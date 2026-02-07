@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
+import { ReleaseChangesTab } from "@/components/release-changes-tab";
 import { ReleaseStatusBadge } from "@/components/release-status-badge";
 import { RELEASE_STATUSES } from "@/lib/domain/types";
 import { useAppState } from "@/lib/state/app-state";
@@ -184,12 +185,16 @@ export default function ReleaseWorkspacePage() {
         </div>
 
         <div className="space-y-4 p-5">
-          <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-            <h3 className="text-sm font-semibold uppercase tracking-[0.12em] text-slate-500">
-              {TAB_OPTIONS.find((tab) => tab.id === activeTab)?.label}
-            </h3>
-            <p className="mt-2 text-sm text-slate-700">{TAB_DESCRIPTION[activeTab]}</p>
-          </div>
+          {activeTab === "changes" ? <ReleaseChangesTab release={release} /> : null}
+
+          {activeTab !== "changes" ? (
+            <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+              <h3 className="text-sm font-semibold uppercase tracking-[0.12em] text-slate-500">
+                {TAB_OPTIONS.find((tab) => tab.id === activeTab)?.label}
+              </h3>
+              <p className="mt-2 text-sm text-slate-700">{TAB_DESCRIPTION[activeTab]}</p>
+            </div>
+          ) : null}
 
           {activeTab === "audit" ? (
             <div className="space-y-2">
@@ -209,11 +214,13 @@ export default function ReleaseWorkspacePage() {
             </div>
           ) : null}
 
-          <div className="rounded-xl border border-slate-200 bg-white p-4">
-            <p className="text-sm text-slate-700">
-              Workspace health: {releases.length} release(s) currently tracked.
-            </p>
-          </div>
+          {activeTab !== "changes" ? (
+            <div className="rounded-xl border border-slate-200 bg-white p-4">
+              <p className="text-sm text-slate-700">
+                Workspace health: {releases.length} release(s) currently tracked.
+              </p>
+            </div>
+          ) : null}
         </div>
       </div>
     </section>
