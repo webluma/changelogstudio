@@ -16,6 +16,9 @@ import type {
   ChangeItem,
   ChangeRisk,
   ChangeType,
+  DraftFormat,
+  GenerationLength,
+  GenerationTone,
   Release,
   ReleaseStatus,
 } from "@/lib/domain/types";
@@ -57,6 +60,16 @@ interface UpdateChangeInput {
   supportNotes?: string;
 }
 
+interface AddDraftInput {
+  source: "ai" | "user";
+  content: string;
+  format: DraftFormat;
+  audience?: Audience;
+  tone?: GenerationTone;
+  length?: GenerationLength;
+  title?: string;
+}
+
 interface AppStateValue {
   isHydrated: boolean;
   storageError?: string;
@@ -82,6 +95,8 @@ interface AppStateValue {
     risk: ChangeRisk,
   ) => number;
   bulkDeleteChanges: (releaseId: string, changeIds: string[]) => number;
+  addDraft: (releaseId: string, input: AddDraftInput) => string | null;
+  setPrimaryDraft: (releaseId: string, draftId: string) => boolean;
   getReleaseById: (releaseId: string) => Release | undefined;
   logReleaseViewed: (releaseId: string) => void;
 }
@@ -149,6 +164,18 @@ type AppAction =
       type: "bulk_delete_changes";
       releaseId: string;
       changeIds: string[];
+      event: AuditEvent;
+    }
+  | {
+      type: "add_draft";
+      releaseId: string;
+      draft: Release["drafts"][number];
+      event: AuditEvent;
+    }
+  | {
+      type: "set_primary_draft";
+      releaseId: string;
+      draftId: string;
       event: AuditEvent;
     };
 
@@ -308,6 +335,41 @@ function appStateReducer(state: AppState, action: AppAction): AppState {
           auditLog: [action.event, ...state.database.auditLog],
         },
       };
+    case "add_draft":
+      return {
+        ...state,
+        database: {
+          ...state.database,
+          releases: state.database.releases.map((release) =>
+            release.id === action.releaseId
+              ? {
+                  ...release,
+                  drafts: [...release.drafts, action.draft],
+                  primaryDraftId: release.primaryDraftId ?? action.draft.id,
+                  updatedAt: now,
+                }
+              : release,
+          ),
+          auditLog: [action.event, ...state.database.auditLog],
+        },
+      };
+    case "set_primary_draft":
+      return {
+        ...state,
+        database: {
+          ...state.database,
+          releases: state.database.releases.map((release) =>
+            release.id === action.releaseId
+              ? {
+                  ...release,
+                  primaryDraftId: action.draftId,
+                  updatedAt: now,
+                }
+              : release,
+          ),
+          auditLog: [action.event, ...state.database.auditLog],
+        },
+      };
     case "add_audit_event":
       return {
         ...state,
@@ -371,6 +433,28 @@ function buildChange(input: CreateChangeInput): ChangeItem {
     supportNotes: input.supportNotes,
     createdAt: now,
     updatedAt: now,
+  };
+}
+
+function buildDraft(
+  release: Release,
+  input: AddDraftInput,
+): Release["drafts"][number] {
+  const latestVersion = release.drafts.reduce((max, draft) => {
+    return Math.max(max, draft.version);
+  }, 0);
+
+  return {
+    id: createId("drf"),
+    version: latestVersion + 1,
+    source: input.source,
+    content: input.content,
+    format: input.format,
+    audience: input.audience,
+    tone: input.tone,
+    length: input.length,
+    title: input.title,
+    createdAt: new Date().toISOString(),
   };
 }
 
@@ -639,6 +723,67 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
     [state.database.releases],
   );
 
+  const addDraft = useCallback(
+    (releaseId: string, input: AddDraftInput) => {
+      const release = state.database.releases.find((item) => item.id === releaseId);
+      if (!release) {
+        return null;
+      }
+
+      const draft = buildDraft(release, input);
+      const event = createAuditEvent({
+        event: "draft.generated",
+        releaseId,
+        entityId: draft.id,
+        metadata: {
+          version: draft.version,
+          source: draft.source,
+          format: draft.format ?? "markdown",
+        },
+      });
+
+      dispatch({
+        type: "add_draft",
+        releaseId,
+        draft,
+        event,
+      });
+
+      return draft.id;
+    },
+    [state.database.releases],
+  );
+
+  const setPrimaryDraft = useCallback(
+    (releaseId: string, draftId: string) => {
+      const release = state.database.releases.find((item) => item.id === releaseId);
+      if (!release) {
+        return false;
+      }
+
+      const draftExists = release.drafts.some((draft) => draft.id === draftId);
+      if (!draftExists) {
+        return false;
+      }
+
+      const event = createAuditEvent({
+        event: "draft.promoted",
+        releaseId,
+        entityId: draftId,
+      });
+
+      dispatch({
+        type: "set_primary_draft",
+        releaseId,
+        draftId,
+        event,
+      });
+
+      return true;
+    },
+    [state.database.releases],
+  );
+
   const getReleaseById = useCallback(
     (releaseId: string) => {
       return state.database.releases.find((release) => release.id === releaseId);
@@ -673,10 +818,13 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
       bulkSetChangeScope,
       bulkSetChangeRisk,
       bulkDeleteChanges,
+      addDraft,
+      setPrimaryDraft,
       getReleaseById,
       logReleaseViewed,
     };
   }, [
+    addDraft,
     addChange,
     bulkDeleteChanges,
     bulkSetChangeRisk,
@@ -685,6 +833,7 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
     duplicateRelease,
     getReleaseById,
     logReleaseViewed,
+    setPrimaryDraft,
     setReleaseStatus,
     state.database.auditLog,
     state.database.releases,

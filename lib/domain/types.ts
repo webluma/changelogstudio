@@ -18,11 +18,22 @@ export const CHANGE_TYPES = [
 export const CHANGE_RISKS = ["low", "medium", "high"] as const;
 
 export const AUDIENCES = ["customer", "technical", "internal", "support"] as const;
+export const DRAFT_FORMATS = ["markdown", "json"] as const;
+export const GENERATION_TONES = [
+  "professional",
+  "friendly",
+  "direct",
+  "brand_voice",
+] as const;
+export const GENERATION_LENGTHS = ["short", "standard", "detailed"] as const;
 
 export type ReleaseStatus = (typeof RELEASE_STATUSES)[number];
 export type ChangeType = (typeof CHANGE_TYPES)[number];
 export type ChangeRisk = (typeof CHANGE_RISKS)[number];
 export type Audience = (typeof AUDIENCES)[number];
+export type DraftFormat = (typeof DRAFT_FORMATS)[number];
+export type GenerationTone = (typeof GENERATION_TONES)[number];
+export type GenerationLength = (typeof GENERATION_LENGTHS)[number];
 
 export type AuditEventName =
   | "release.created"
@@ -34,7 +45,9 @@ export type AuditEventName =
   | "change.deleted"
   | "change.scope_tagged"
   | "change.risk_updated"
-  | "change.bulk_deleted";
+  | "change.bulk_deleted"
+  | "draft.generated"
+  | "draft.promoted";
 
 export interface ChangeLink {
   label: string;
@@ -63,6 +76,11 @@ export interface DraftVersion {
   version: number;
   source: "ai" | "user";
   content: string;
+  format?: DraftFormat;
+  audience?: Audience;
+  tone?: GenerationTone;
+  length?: GenerationLength;
+  title?: string;
   createdAt: string;
 }
 
