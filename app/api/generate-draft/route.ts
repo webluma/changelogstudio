@@ -143,8 +143,7 @@ async function requestOpenAiDraft(
   });
 
   if (!response.ok) {
-    const detail = await response.text();
-    throw new Error(`OpenAI request failed (${response.status}): ${detail}`);
+    throw new Error(`OPENAI_REQUEST_FAILED:${response.status}`);
   }
 
   const data = (await response.json()) as {
@@ -190,8 +189,25 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Draft generation failed.";
-    const statusCode = message.includes("OPENAI_API_KEY") ? 503 : 500;
+    if (message.startsWith("OPENAI_REQUEST_FAILED:")) {
+      const statusText = message.replace("OPENAI_REQUEST_FAILED:", "");
+      const statusNumber = Number.parseInt(statusText, 10);
+      const mappedMessage =
+        statusNumber === 401 || statusNumber === 403
+          ? "OpenAI authentication failed on the server."
+          : statusNumber === 429
+            ? "OpenAI rate limit reached. Please try again in a few moments."
+            : "OpenAI request failed. Please try again.";
+      return NextResponse.json({ error: mappedMessage }, { status: 502 });
+    }
 
-    return NextResponse.json({ error: message }, { status: statusCode });
+    if (message.includes("OPENAI_API_KEY")) {
+      return NextResponse.json(
+        { error: "OPENAI_API_KEY is missing on the server." },
+        { status: 503 },
+      );
+    }
+
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }

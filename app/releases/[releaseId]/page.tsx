@@ -3,7 +3,9 @@
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
+import { GenerateDraftModal } from "@/components/generate-draft-modal";
 import { ReleaseChangesTab } from "@/components/release-changes-tab";
+import { ReleaseDraftsTab } from "@/components/release-drafts-tab";
 import { ReleaseStatusBadge } from "@/components/release-status-badge";
 import { RELEASE_STATUSES } from "@/lib/domain/types";
 import { useAppState } from "@/lib/state/app-state";
@@ -23,7 +25,7 @@ const TAB_DESCRIPTION: Record<WorkspaceTab, string> = {
   changes:
     "Structured change management lands in Phase 3. This tab is already wired to release metadata and status.",
   drafts:
-    "AI generation and versioned drafts land in Phases 4 and 5 with diff support and primary draft control.",
+    "Generated and manual drafts are versioned here, with diff comparison and primary draft control.",
   review:
     "Editorial checklist and section comments land in Phase 6.",
   publish:
@@ -37,6 +39,8 @@ export default function ReleaseWorkspacePage() {
   const releaseId = params.releaseId;
   const [activeTab, setActiveTab] = useState<WorkspaceTab>("changes");
   const [notFoundReleaseId, setNotFoundReleaseId] = useState<string | null>(null);
+  const [isGenerateModalOpen, setIsGenerateModalOpen] = useState(false);
+  const [workspaceNotice, setWorkspaceNotice] = useState<string | null>(null);
 
   const { isHydrated, releases, auditLog, getReleaseById, setReleaseStatus, logReleaseViewed } =
     useAppState();
@@ -108,8 +112,16 @@ export default function ReleaseWorkspacePage() {
     return null;
   }
 
+  const canGenerateDraft = release.changes.length > 0;
+
   return (
     <section className="page-enter space-y-6">
+      {workspaceNotice ? (
+        <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+          {workspaceNotice}
+        </div>
+      ) : null}
+
       <header className="flex flex-col gap-4 rounded-2xl border border-slate-200 bg-white p-5 lg:flex-row lg:items-start lg:justify-between">
         <div className="space-y-2">
           <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
@@ -143,8 +155,19 @@ export default function ReleaseWorkspacePage() {
           <div className="flex flex-wrap gap-2">
             <button
               type="button"
-              disabled
-              className="rounded-lg border border-slate-200 bg-slate-100 px-3 py-1.5 text-xs font-medium text-slate-500"
+              onClick={() => {
+                setWorkspaceNotice(null);
+                setIsGenerateModalOpen(true);
+              }}
+              disabled={!canGenerateDraft}
+              title={
+                canGenerateDraft ? "Open draft generator" : "Add at least one change to enable generation"
+              }
+              className={`rounded-lg px-3 py-1.5 text-xs font-medium transition ${
+                canGenerateDraft
+                  ? "border border-slate-900 bg-slate-900 text-white hover:bg-slate-700"
+                  : "cursor-not-allowed border border-slate-200 bg-slate-100 text-slate-500"
+              }`}
             >
               Generate
             </button>
@@ -186,8 +209,9 @@ export default function ReleaseWorkspacePage() {
 
         <div className="space-y-4 p-5">
           {activeTab === "changes" ? <ReleaseChangesTab release={release} /> : null}
+          {activeTab === "drafts" ? <ReleaseDraftsTab release={release} /> : null}
 
-          {activeTab !== "changes" ? (
+          {activeTab === "review" || activeTab === "publish" ? (
             <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
               <h3 className="text-sm font-semibold uppercase tracking-[0.12em] text-slate-500">
                 {TAB_OPTIONS.find((tab) => tab.id === activeTab)?.label}
@@ -214,7 +238,7 @@ export default function ReleaseWorkspacePage() {
             </div>
           ) : null}
 
-          {activeTab !== "changes" ? (
+          {activeTab === "review" || activeTab === "publish" ? (
             <div className="rounded-xl border border-slate-200 bg-white p-4">
               <p className="text-sm text-slate-700">
                 Workspace health: {releases.length} release(s) currently tracked.
@@ -223,6 +247,17 @@ export default function ReleaseWorkspacePage() {
           ) : null}
         </div>
       </div>
+
+      {isGenerateModalOpen ? (
+        <GenerateDraftModal
+          release={release}
+          onClose={() => setIsGenerateModalOpen(false)}
+          onGenerated={() => {
+            setActiveTab("drafts");
+            setWorkspaceNotice("Draft generated successfully and saved as a new version.");
+          }}
+        />
+      ) : null}
     </section>
   );
 }

@@ -38,6 +38,8 @@ function buildAppStateMock() {
     bulkSetChangeScope: vi.fn().mockReturnValue(1),
     bulkSetChangeRisk: vi.fn().mockReturnValue(1),
     bulkDeleteChanges: vi.fn().mockReturnValue(1),
+    addDraft: vi.fn(),
+    setPrimaryDraft: vi.fn(),
     getReleaseById: vi.fn(),
     logReleaseViewed: vi.fn(),
   };
