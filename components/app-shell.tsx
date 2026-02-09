@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { getCurrentPhase, getNextPhase, getPhaseStatusLabel } from "@/lib/project-phase";
 import { useAppState } from "@/lib/state/app-state";
 
 const NAVIGATION_ITEMS = [{ href: "/", label: "Releases" }];
@@ -9,6 +10,8 @@ const NAVIGATION_ITEMS = [{ href: "/", label: "Releases" }];
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { releases } = useAppState();
+  const currentPhase = getCurrentPhase();
+  const nextPhase = getNextPhase();
 
   return (
     <div className="min-h-screen bg-[radial-gradient(circle_at_top_left,_#f6fbff,_#f5f7fb_42%,_#eef2ff_100%)] text-slate-900">
@@ -47,7 +50,17 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
               Scope
             </p>
-            <p className="mt-1 text-sm text-slate-800">Phase 2 foundation active</p>
+            <p className="mt-1 text-sm font-semibold text-slate-800">
+              Phase {currentPhase.number}: {currentPhase.title}
+            </p>
+            <p className="text-xs text-slate-600">
+              Status: {getPhaseStatusLabel(currentPhase.status)}
+            </p>
+            {nextPhase ? (
+              <p className="mt-1 text-xs text-slate-600">
+                Next: Phase {nextPhase.number} ({nextPhase.title})
+              </p>
+            ) : null}
             <p className="mt-2 text-xs text-slate-600">{releases.length} release(s) in workspace</p>
           </div>
         </aside>
