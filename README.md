@@ -90,6 +90,9 @@ Changelog Studio uses the OpenAI API as its generation engine.
 ## Manual Validation (Baseline)
 
 - Project starts locally
+- Home route explains what Changelog Studio is and how to use each workflow step
+- Workspace route (`/workspace`) contains release creation/listing and open/duplicate actions
+- Workspace includes a "Load Example Release" action with a complete sample flow
 - Home route loads without template leftovers
 - README reflects the product scope and workflow
 

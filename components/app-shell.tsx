@@ -5,7 +5,10 @@ import { usePathname } from "next/navigation";
 import { getCurrentPhase, getNextPhase, getPhaseStatusLabel } from "@/lib/project-phase";
 import { useAppState } from "@/lib/state/app-state";
 
-const NAVIGATION_ITEMS = [{ href: "/", label: "Releases" }];
+const NAVIGATION_ITEMS = [
+  { href: "/", label: "Home" },
+  { href: "/workspace", label: "Workspace" },
+];
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -28,8 +31,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             {NAVIGATION_ITEMS.map((item) => {
               const isActive =
                 item.href === "/"
-                  ? pathname === "/" || pathname.startsWith("/releases")
-                  : pathname === item.href;
+                  ? pathname === "/"
+                  : pathname === "/workspace" || pathname.startsWith("/releases");
               return (
                 <Link
                   key={item.href}
