@@ -54,6 +54,49 @@ export function GenerateDraftModal({
   const [progressIndex, setProgressIndex] = useState(0);
 
   const hasChanges = release.changes.length > 0;
+  const qualitySummary = useMemo(() => {
+    return release.changes.reduce(
+      (accumulator, change) => {
+        if (!change.description.trim()) {
+          accumulator.missingDescription += 1;
+        }
+        if (!change.scope.trim()) {
+          accumulator.missingScope += 1;
+        }
+        if (change.audiences.length === 0) {
+          accumulator.missingAudience += 1;
+        }
+        if (change.isBreaking && !(change.migrationNotes ?? "").trim()) {
+          accumulator.missingMigration += 1;
+        }
+        if (!change.customerImpact?.trim()) {
+          accumulator.missingCustomerImpact += 1;
+        }
+        if (!change.supportNotes?.trim()) {
+          accumulator.missingSupportNotes += 1;
+        }
+        if (change.links.length === 0) {
+          accumulator.missingLinks += 1;
+        }
+        return accumulator;
+      },
+      {
+        missingDescription: 0,
+        missingScope: 0,
+        missingAudience: 0,
+        missingMigration: 0,
+        missingCustomerImpact: 0,
+        missingSupportNotes: 0,
+        missingLinks: 0,
+      },
+    );
+  }, [release.changes]);
+  const criticalMissingTotal =
+    qualitySummary.missingDescription +
+    qualitySummary.missingScope +
+    qualitySummary.missingAudience +
+    qualitySummary.missingMigration;
+  const canGenerate = hasChanges && !isGenerating && criticalMissingTotal === 0;
 
   useEffect(() => {
     if (!isGenerating) {
@@ -74,7 +117,7 @@ export function GenerateDraftModal({
   }, [progressIndex]);
 
   async function handleGenerate() {
-    if (!hasChanges || isGenerating) {
+    if (!canGenerate) {
       return;
     }
 
@@ -152,9 +195,61 @@ export function GenerateDraftModal({
         </header>
 
         <div className="space-y-5 p-5">
+          <div className="rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900">
+            <p className="font-semibold">How to Configure This Step</p>
+            <div className="mt-2 grid gap-2 md:grid-cols-2">
+              <p>
+                <span className="font-semibold">Audience:</span> Choose who will read this output
+                first (customer, technical, internal, support).
+              </p>
+              <p>
+                <span className="font-semibold">Tone:</span> Use professional for formal releases,
+                direct for concise technical notes, friendly for customer updates.
+              </p>
+              <p>
+                <span className="font-semibold">Length:</span> Short for highlights, standard for
+                most releases, detailed for complex rollouts.
+              </p>
+              <p>
+                <span className="font-semibold">Sections:</span> Enable only what this audience
+                needs to reduce noise and improve clarity.
+              </p>
+            </div>
+          </div>
+
           {!hasChanges ? (
             <div className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-800">
               Add at least one change before generating a draft.
+            </div>
+          ) : null}
+
+          {hasChanges ? (
+            <div
+              className={`rounded-xl border px-4 py-3 text-sm ${
+                criticalMissingTotal === 0
+                  ? "border-emerald-300 bg-emerald-50 text-emerald-800"
+                  : "border-amber-300 bg-amber-50 text-amber-800"
+              }`}
+            >
+              <p className="font-semibold">AI Input Quality Check</p>
+              {criticalMissingTotal === 0 ? (
+                <p className="mt-1">
+                  Critical fields are complete. Draft generation is ready.
+                </p>
+              ) : (
+                <p className="mt-1">
+                  Complete critical fields in Changes before generating drafts.
+                </p>
+              )}
+              <ul className="mt-2 grid gap-1 text-xs md:grid-cols-2">
+                <li>Missing descriptions: {qualitySummary.missingDescription}</li>
+                <li>Missing scope: {qualitySummary.missingScope}</li>
+                <li>Missing audience relevance: {qualitySummary.missingAudience}</li>
+                <li>Breaking changes without migration: {qualitySummary.missingMigration}</li>
+                <li>Missing customer impact (recommended): {qualitySummary.missingCustomerImpact}</li>
+                <li>Missing support notes (recommended): {qualitySummary.missingSupportNotes}</li>
+                <li>Changes without links (recommended): {qualitySummary.missingLinks}</li>
+              </ul>
             </div>
           ) : null}
 
@@ -320,7 +415,7 @@ export function GenerateDraftModal({
           <button
             type="button"
             onClick={handleGenerate}
-            disabled={!hasChanges || isGenerating}
+            disabled={!canGenerate}
             className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {isGenerating ? "Generating..." : "Generate Draft"}

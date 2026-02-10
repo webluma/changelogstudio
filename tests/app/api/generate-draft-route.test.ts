@@ -81,29 +81,23 @@ describe("POST /api/generate-draft", () => {
     vi.stubEnv("OPENAI_API_KEY", "test-key");
 
     const openAiResponse = {
-      choices: [
-        {
-          message: {
-            content: JSON.stringify({
-              headline: "Release 1",
-              summary: "Technical updates for release 1.",
-              sections: {
-                features: ["Added retries for transient failures."],
-                fixes: [],
-                improvements: [],
-                security: [],
-                breakingChanges: [],
-                deprecations: [],
-                knownIssues: [],
-                migrationNotes: [],
-              },
-              supportFaq: [],
-              rolloutPlan: ["Start with canary deployment."],
-              missingInfo: [],
-            }),
-          },
+      output_text: JSON.stringify({
+        headline: "Release 1",
+        summary: "Technical updates for release 1.",
+        sections: {
+          features: ["Added retries for transient failures."],
+          fixes: [],
+          improvements: [],
+          security: [],
+          breakingChanges: [],
+          deprecations: [],
+          knownIssues: [],
+          migrationNotes: [],
         },
-      ],
+        supportFaq: [],
+        rolloutPlan: ["Start with canary deployment."],
+        missingInfo: [],
+      }),
     };
 
     const fetchMock = vi.fn().mockResolvedValue(
@@ -121,7 +115,7 @@ describe("POST /api/generate-draft", () => {
     expect(body.format).toBe("markdown");
     expect(body.rendered).toContain("# Release 1");
     expect(fetchMock).toHaveBeenCalledTimes(1);
-    expect(fetchMock.mock.calls[0][0]).toBe("https://api.openai.com/v1/chat/completions");
+    expect(fetchMock.mock.calls[0][0]).toBe("https://api.openai.com/v1/responses");
     expect(
       (fetchMock.mock.calls[0][1] as { headers?: Record<string, string> }).headers?.Authorization,
     ).toBe("Bearer test-key");

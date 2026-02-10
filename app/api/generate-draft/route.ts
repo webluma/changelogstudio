@@ -13,6 +13,8 @@ import {
 } from "@/lib/ai/types";
 import { renderGeneratedDraft } from "@/lib/ai/render-draft";
 
+const DEFAULT_OPENAI_MODEL = "gpt-5-nano";
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
 }
@@ -27,6 +29,92 @@ function isOneOf(value: string, allowed: readonly string[]): boolean {
 
 function isOptionalString(value: unknown): value is string | undefined {
   return typeof value === "undefined" || typeof value === "string";
+}
+
+function toStringValue(value: unknown): string {
+  return typeof value === "string" ? value.trim() : "";
+}
+
+function toStringArray(value: unknown): string[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  return value
+    .map((item) => (typeof item === "string" ? item.trim() : ""))
+    .filter(Boolean);
+}
+
+function getFieldByAliases(
+  record: Record<string, unknown>,
+  aliases: string[],
+): unknown {
+  for (const alias of aliases) {
+    if (alias in record) {
+      return record[alias];
+    }
+  }
+  return undefined;
+}
+
+function normalizeGeneratedDraftPayload(value: unknown): GeneratedDraftPayload | null {
+  if (!isRecord(value)) {
+    return null;
+  }
+
+  const sectionsCandidate = isRecord(value.sections)
+    ? value.sections
+    : isRecord(value.section)
+      ? value.section
+      : {};
+
+  const normalized: GeneratedDraftPayload = {
+    headline: toStringValue(getFieldByAliases(value, ["headline", "title"])),
+    summary: toStringValue(getFieldByAliases(value, ["summary", "overview"])),
+    sections: {
+      features: toStringArray(getFieldByAliases(sectionsCandidate, ["features", "feature"])),
+      fixes: toStringArray(getFieldByAliases(sectionsCandidate, ["fixes", "bugfixes"])),
+      improvements: toStringArray(
+        getFieldByAliases(sectionsCandidate, ["improvements", "improvement"]),
+      ),
+      security: toStringArray(getFieldByAliases(sectionsCandidate, ["security"])),
+      breakingChanges: toStringArray(
+        getFieldByAliases(sectionsCandidate, [
+          "breakingChanges",
+          "breaking_changes",
+          "breaking changes",
+        ]),
+      ),
+      deprecations: toStringArray(getFieldByAliases(sectionsCandidate, ["deprecations"])),
+      knownIssues: toStringArray(
+        getFieldByAliases(sectionsCandidate, ["knownIssues", "known_issues", "known issues"]),
+      ),
+      migrationNotes: toStringArray(
+        getFieldByAliases(sectionsCandidate, [
+          "migrationNotes",
+          "migration_notes",
+          "migration notes",
+        ]),
+      ),
+    },
+    supportFaq: toStringArray(
+      getFieldByAliases(value, ["supportFaq", "support_faq", "support faq", "faq"]),
+    ),
+    rolloutPlan: toStringArray(
+      getFieldByAliases(value, ["rolloutPlan", "rollout_plan", "rollout plan"]),
+    ),
+    missingInfo: toStringArray(
+      getFieldByAliases(value, ["missingInfo", "missing_info", "missing info", "todos"]),
+    ),
+  };
+
+  if (!normalized.headline) {
+    normalized.headline = "Release draft";
+  }
+  if (!normalized.summary) {
+    normalized.summary = "No summary provided.";
+  }
+
+  return isValidGeneratedDraftPayload(normalized) ? normalized : null;
 }
 
 function isChangeItem(value: unknown): value is ChangeItem {
@@ -99,10 +187,75 @@ function stripCodeFences(text: string): string {
   return trimmed.slice(firstLineBreak + 1, lastFence).trim();
 }
 
+function parsePossiblyWrappedJson(text: string): unknown {
+  const direct = stripCodeFences(text);
+  try {
+    return JSON.parse(direct) as unknown;
+  } catch {
+    const firstBrace = direct.indexOf("{");
+    const lastBrace = direct.lastIndexOf("}");
+    if (firstBrace === -1 || lastBrace === -1 || lastBrace <= firstBrace) {
+      throw new Error("OpenAI response is not valid JSON.");
+    }
+    const sliced = direct.slice(firstBrace, lastBrace + 1);
+    return JSON.parse(sliced) as unknown;
+  }
+}
+
+function resolveOpenAiModel(): string {
+  const configured = process.env.OPENAI_MODEL?.trim();
+  if (configured) {
+    return configured;
+  }
+  return DEFAULT_OPENAI_MODEL;
+}
+
+function sanitizeErrorDetail(detail: string): string {
+  return detail.replace(/\s+/g, " ").trim().slice(0, 240);
+}
+
+function extractResponseText(data: unknown): string | undefined {
+  if (!isRecord(data)) {
+    return undefined;
+  }
+
+  if (isString(data.output_text) && data.output_text.trim()) {
+    return data.output_text;
+  }
+
+  const output = data.output;
+  if (!Array.isArray(output)) {
+    return undefined;
+  }
+
+  for (const item of output) {
+    if (!isRecord(item) || !Array.isArray(item.content)) {
+      continue;
+    }
+
+    for (const contentItem of item.content) {
+      if (!isRecord(contentItem)) {
+        continue;
+      }
+
+      if (isString(contentItem.text) && contentItem.text.trim()) {
+        return contentItem.text;
+      }
+
+      if (isRecord(contentItem.text) && isString(contentItem.text.value)) {
+        return contentItem.text.value;
+      }
+    }
+  }
+
+  return undefined;
+}
+
 async function requestOpenAiDraft(
   payload: GenerateDraftRequest,
 ): Promise<GeneratedDraftPayload> {
   const apiKey = process.env.OPENAI_API_KEY;
+  const model = resolveOpenAiModel();
   if (!apiKey) {
     throw new Error("OPENAI_API_KEY is not configured on the server.");
   }
@@ -125,41 +278,41 @@ async function requestOpenAiDraft(
     JSON.stringify(payload),
   ].join("\n");
 
-  const response = await fetch("https://api.openai.com/v1/chat/completions", {
+  const response = await fetch("https://api.openai.com/v1/responses", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       Authorization: `Bearer ${apiKey}`,
     },
     body: JSON.stringify({
-      model: "gpt-4.1-mini",
-      temperature: 0.2,
-      response_format: { type: "json_object" },
-      messages: [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: userPrompt },
-      ],
+      model,
+      instructions: systemPrompt,
+      input: userPrompt,
     }),
   });
 
   if (!response.ok) {
-    throw new Error(`OPENAI_REQUEST_FAILED:${response.status}`);
+    const detail = sanitizeErrorDetail(await response.text());
+    throw new Error(`OPENAI_REQUEST_FAILED:${response.status}:${detail}`);
   }
 
-  const data = (await response.json()) as {
-    choices?: Array<{ message?: { content?: string } }>;
-  };
-  const rawContent = data.choices?.[0]?.message?.content;
+  const data = (await response.json()) as unknown;
+  const rawContent = extractResponseText(data);
   if (!rawContent) {
     throw new Error("OpenAI did not return completion content.");
   }
 
-  const parsed = JSON.parse(stripCodeFences(rawContent)) as unknown;
-  if (!isValidGeneratedDraftPayload(parsed)) {
+  const parsed = parsePossiblyWrappedJson(rawContent);
+  if (isValidGeneratedDraftPayload(parsed)) {
+    return parsed;
+  }
+
+  const normalized = normalizeGeneratedDraftPayload(parsed);
+  if (!normalized) {
     throw new Error("OpenAI response does not match required draft schema.");
   }
 
-  return parsed;
+  return normalized;
 }
 
 export async function POST(request: NextRequest) {
@@ -190,13 +343,18 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     const message = error instanceof Error ? error.message : "Draft generation failed.";
     if (message.startsWith("OPENAI_REQUEST_FAILED:")) {
-      const statusText = message.replace("OPENAI_REQUEST_FAILED:", "");
+      const [, statusText = "", detail = ""] = message.split(":");
       const statusNumber = Number.parseInt(statusText, 10);
+      const detailLower = detail.toLowerCase();
       const mappedMessage =
         statusNumber === 401 || statusNumber === 403
           ? "OpenAI authentication failed on the server."
           : statusNumber === 429
             ? "OpenAI rate limit reached. Please try again in a few moments."
+            : statusNumber === 400 && detailLower.includes("model")
+              ? `OpenAI model is not available. Confirm access to ${resolveOpenAiModel()}.`
+              : statusNumber === 404
+                ? "OpenAI endpoint or model was not found. Check model availability."
             : "OpenAI request failed. Please try again.";
       return NextResponse.json({ error: mappedMessage }, { status: 502 });
     }

@@ -62,6 +62,14 @@ const INITIAL_FORM: ChangeFormValues = {
   ticketUrl: "",
 };
 
+function ImportantFieldBadge() {
+  return (
+    <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-amber-800">
+      Important for AI
+    </span>
+  );
+}
+
 function buildFormFromChange(change: ChangeItem): ChangeFormValues {
   const prLink = change.links.find((link) => link.label === "PR");
   const ticketLink = change.links.find((link) => link.label === "Ticket");
@@ -293,6 +301,40 @@ export function ReleaseChangesTab({ release }: ReleaseChangesTabProps) {
         </div>
       </div>
 
+      <div className="rounded-xl border border-blue-200 bg-blue-50 p-4">
+        <h4 className="text-sm font-semibold text-blue-900">Writing Guide for Changes</h4>
+        <div className="mt-2 grid gap-2 text-xs text-blue-900 md:grid-cols-2">
+          <p>
+            <span className="font-semibold">Title:</span> One concrete change only.
+            Example: &quot;Add retry logic for webhook delivery&quot;.
+          </p>
+          <p>
+            <span className="font-semibold">Description:</span> Raw factual detail from PRs,
+            tickets, or implementation notes.
+          </p>
+          <p>
+            <span className="font-semibold">Scope:</span> Product area or component
+            (billing, auth, editor, api).
+          </p>
+          <p>
+            <span className="font-semibold">Customer Impact:</span> Plain-language benefit
+            the end user can feel.
+          </p>
+          <p>
+            <span className="font-semibold">Support Notes:</span> Practical response guidance
+            for Support/CS.
+          </p>
+          <p>
+            <span className="font-semibold">Breaking changes:</span> If enabled, migration notes
+            must include steps and prerequisites.
+          </p>
+        </div>
+        <p className="mt-3 text-xs text-blue-900">
+          Fields marked as <span className="font-semibold">Important for AI</span> directly affect
+          draft quality and should be filled with concrete information.
+        </p>
+      </div>
+
       {feedbackMessage ? (
         <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
           {feedbackMessage}
@@ -305,7 +347,10 @@ export function ReleaseChangesTab({ release }: ReleaseChangesTabProps) {
           className="grid gap-4 rounded-2xl border border-slate-200 bg-white p-4 md:grid-cols-2"
         >
           <label className="space-y-1 md:col-span-2">
-            <span className="text-sm font-medium text-slate-700">Title</span>
+            <span className="flex items-center gap-2 text-sm font-medium text-slate-700">
+              Title
+              <ImportantFieldBadge />
+            </span>
             <input
               value={formValues.title}
               onChange={(event) =>
@@ -314,10 +359,16 @@ export function ReleaseChangesTab({ release }: ReleaseChangesTabProps) {
               placeholder="Improve onboarding completion tracking"
               className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none ring-slate-900/10 focus:ring-4"
             />
+            <p className="text-xs text-slate-500">
+              Write the outcome, not the task name.
+            </p>
           </label>
 
           <label className="space-y-1 md:col-span-2">
-            <span className="text-sm font-medium text-slate-700">Description</span>
+            <span className="flex items-center gap-2 text-sm font-medium text-slate-700">
+              Description
+              <ImportantFieldBadge />
+            </span>
             <textarea
               rows={3}
               value={formValues.description}
@@ -330,10 +381,16 @@ export function ReleaseChangesTab({ release }: ReleaseChangesTabProps) {
               placeholder="Raw implementation detail, PR context, and behavior changes."
               className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none ring-slate-900/10 focus:ring-4"
             />
+            <p className="text-xs text-slate-500">
+              Keep this factual and implementation-focused. Avoid marketing language.
+            </p>
           </label>
 
           <label className="space-y-1">
-            <span className="text-sm font-medium text-slate-700">Type</span>
+            <span className="flex items-center gap-2 text-sm font-medium text-slate-700">
+              Type
+              <ImportantFieldBadge />
+            </span>
             <select
               value={formValues.type}
               onChange={(event) =>
@@ -350,10 +407,14 @@ export function ReleaseChangesTab({ release }: ReleaseChangesTabProps) {
                 </option>
               ))}
             </select>
+            <p className="text-xs text-slate-500">Choose the real nature of the change.</p>
           </label>
 
           <label className="space-y-1">
-            <span className="text-sm font-medium text-slate-700">Risk</span>
+            <span className="flex items-center gap-2 text-sm font-medium text-slate-700">
+              Risk
+              <ImportantFieldBadge />
+            </span>
             <select
               value={formValues.risk}
               onChange={(event) =>
@@ -370,10 +431,16 @@ export function ReleaseChangesTab({ release }: ReleaseChangesTabProps) {
                 </option>
               ))}
             </select>
+            <p className="text-xs text-slate-500">
+              Estimate production impact if this change behaves unexpectedly.
+            </p>
           </label>
 
           <label className="space-y-1">
-            <span className="text-sm font-medium text-slate-700">Scope</span>
+            <span className="flex items-center gap-2 text-sm font-medium text-slate-700">
+              Scope
+              <ImportantFieldBadge />
+            </span>
             <input
               value={formValues.scope}
               onChange={(event) =>
@@ -382,10 +449,14 @@ export function ReleaseChangesTab({ release }: ReleaseChangesTabProps) {
               placeholder="billing"
               className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none ring-slate-900/10 focus:ring-4"
             />
+            <p className="text-xs text-slate-500">Use component or domain names.</p>
           </label>
 
           <label className="space-y-1">
-            <span className="text-sm font-medium text-slate-700">Breaking Change</span>
+            <span className="flex items-center gap-2 text-sm font-medium text-slate-700">
+              Breaking Change
+              <ImportantFieldBadge />
+            </span>
             <select
               value={formValues.isBreaking ? "yes" : "no"}
               onChange={(event) =>
@@ -399,10 +470,16 @@ export function ReleaseChangesTab({ release }: ReleaseChangesTabProps) {
               <option value="no">No</option>
               <option value="yes">Yes</option>
             </select>
+            <p className="text-xs text-slate-500">
+              Mark as breaking only when users or integrators must take action.
+            </p>
           </label>
 
           <fieldset className="space-y-2 md:col-span-2">
-            <legend className="text-sm font-medium text-slate-700">Audience Relevance</legend>
+            <legend className="flex items-center gap-2 text-sm font-medium text-slate-700">
+              Audience Relevance
+              <ImportantFieldBadge />
+            </legend>
             <div className="flex flex-wrap gap-2">
               {AUDIENCES.map((audience) => {
                 const checked = formValues.audiences.includes(audience);
@@ -422,11 +499,17 @@ export function ReleaseChangesTab({ release }: ReleaseChangesTabProps) {
                 );
               })}
             </div>
+            <p className="text-xs text-slate-500">
+              Select all audiences that need this information in final release notes.
+            </p>
           </fieldset>
 
           {formValues.isBreaking ? (
             <label className="space-y-1 md:col-span-2">
-              <span className="text-sm font-medium text-slate-700">Migration Notes</span>
+              <span className="flex items-center gap-2 text-sm font-medium text-slate-700">
+                Migration Notes
+                <ImportantFieldBadge />
+              </span>
               <textarea
                 rows={2}
                 value={formValues.migrationNotes}
@@ -439,6 +522,9 @@ export function ReleaseChangesTab({ release }: ReleaseChangesTabProps) {
                 placeholder="Describe migration steps for affected users."
                 className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none ring-slate-900/10 focus:ring-4"
               />
+              <p className="text-xs text-slate-500">
+                Provide ordered steps, required versions, and fallback guidance.
+              </p>
             </label>
           ) : null}
 
