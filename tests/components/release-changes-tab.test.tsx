@@ -2,13 +2,27 @@ import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { ReleaseChangesTab } from "@/components/release-changes-tab";
 import { useAppState } from "@/lib/state/app-state";
-import type { Release } from "@/lib/domain/types";
+import {
+  REVIEW_CHECKLIST_ITEMS,
+  type Release,
+  type ReviewChecklistItemKey,
+} from "@/lib/domain/types";
 
 vi.mock("@/lib/state/app-state", () => ({
   useAppState: vi.fn(),
 }));
 
 const mockedUseAppState = vi.mocked(useAppState);
+
+function buildChecklist(value = false): Record<ReviewChecklistItemKey, boolean> {
+  return REVIEW_CHECKLIST_ITEMS.reduce<Record<ReviewChecklistItemKey, boolean>>(
+    (accumulator, item) => {
+      accumulator[item.key] = value;
+      return accumulator;
+    },
+    {} as Record<ReviewChecklistItemKey, boolean>,
+  );
+}
 
 function buildRelease(overrides?: Partial<Release>): Release {
   return {
@@ -18,6 +32,10 @@ function buildRelease(overrides?: Partial<Release>): Release {
     status: "draft",
     changes: [],
     drafts: [],
+    review: {
+      checklist: buildChecklist(false),
+      comments: [],
+    },
     createdAt: "2026-02-01T10:00:00.000Z",
     updatedAt: "2026-02-01T10:00:00.000Z",
     ...overrides,
@@ -40,6 +58,9 @@ function buildAppStateMock() {
     bulkDeleteChanges: vi.fn().mockReturnValue(1),
     addDraft: vi.fn(),
     setPrimaryDraft: vi.fn(),
+    setReviewChecklistItem: vi.fn().mockReturnValue(true),
+    addReviewComment: vi.fn(),
+    deleteReviewComment: vi.fn().mockReturnValue(true),
     getReleaseById: vi.fn(),
     logReleaseViewed: vi.fn(),
   };
@@ -66,7 +87,7 @@ describe("ReleaseChangesTab", () => {
     expect(form).not.toBeNull();
 
     await user.type(within(form as HTMLElement).getByLabelText(/Title/i), "Auth payload changed");
-    await user.type(within(form as HTMLElement).getByLabelText(/^Scope$/i), "auth");
+    await user.type(within(form as HTMLElement).getByLabelText(/Scope/i), "auth");
     await user.selectOptions(within(form as HTMLElement).getByLabelText(/Breaking Change/i), "yes");
     await user.click(createButton);
 

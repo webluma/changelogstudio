@@ -1,11 +1,17 @@
 "use client";
 
-import { APP_STORAGE_KEY, createEmptyDatabase } from "@/lib/domain/defaults";
+import {
+  APP_STORAGE_KEY,
+  createDefaultReviewState,
+  createEmptyDatabase,
+} from "@/lib/domain/defaults";
 import {
   AUDIENCES,
   CHANGE_RISKS,
   CHANGE_TYPES,
   RELEASE_STATUSES,
+  REVIEW_CHECKLIST_ITEMS,
+  REVIEW_SECTIONS,
   type AppDatabase,
 } from "@/lib/domain/types";
 
@@ -87,6 +93,39 @@ function isDraftVersion(value: unknown): boolean {
   );
 }
 
+function isReviewChecklist(value: unknown): boolean {
+  if (!isRecord(value)) {
+    return false;
+  }
+
+  return REVIEW_CHECKLIST_ITEMS.every((item) => typeof value[item.key] === "boolean");
+}
+
+function isReviewComment(value: unknown): boolean {
+  if (!isRecord(value)) {
+    return false;
+  }
+
+  const sectionValid = isString(value.section) && isOneOf(value.section, REVIEW_SECTIONS);
+
+  return (
+    isString(value.id) &&
+    sectionValid &&
+    isString(value.message) &&
+    value.actor === "user" &&
+    isString(value.createdAt)
+  );
+}
+
+function isReviewState(value: unknown): boolean {
+  if (!isRecord(value)) {
+    return false;
+  }
+
+  const commentsValid = Array.isArray(value.comments) && value.comments.every(isReviewComment);
+  return isReviewChecklist(value.checklist) && commentsValid;
+}
+
 function isRelease(value: unknown): boolean {
   if (!isRecord(value)) {
     return false;
@@ -96,6 +135,7 @@ function isRelease(value: unknown): boolean {
     isString(value.status) && isOneOf(value.status, RELEASE_STATUSES);
   const changesValid = Array.isArray(value.changes) && value.changes.every(isChangeItem);
   const draftsValid = Array.isArray(value.drafts) && value.drafts.every(isDraftVersion);
+  const reviewValid = typeof value.review === "undefined" || isReviewState(value.review);
 
   return (
     isString(value.id) &&
@@ -106,6 +146,7 @@ function isRelease(value: unknown): boolean {
     statusValid &&
     changesValid &&
     draftsValid &&
+    reviewValid &&
     isOptionalString(value.primaryDraftId) &&
     isString(value.createdAt) &&
     isString(value.updatedAt) &&
@@ -166,7 +207,15 @@ export function loadDatabase(): LoadResult {
       };
     }
 
-    return { data: parsed };
+    const normalized: AppDatabase = {
+      ...parsed,
+      releases: parsed.releases.map((release) => ({
+        ...release,
+        review: release.review ?? createDefaultReviewState(),
+      })),
+    };
+
+    return { data: normalized };
   } catch {
     return {
       data: createEmptyDatabase(),

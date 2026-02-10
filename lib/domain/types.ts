@@ -26,6 +26,46 @@ export const GENERATION_TONES = [
   "brand_voice",
 ] as const;
 export const GENERATION_LENGTHS = ["short", "standard", "detailed"] as const;
+export const REVIEW_SECTIONS = [
+  "overview",
+  "features",
+  "fixes",
+  "improvements",
+  "security",
+  "breaking_changes",
+  "known_issues",
+  "support_faq",
+] as const;
+export const REVIEW_CHECKLIST_ITEMS = [
+  {
+    key: "audience_match",
+    label: "Audience match (customer-facing text avoids heavy jargon)",
+  },
+  {
+    key: "no_promises",
+    label: "No future commitments or delivery promises",
+  },
+  {
+    key: "breaking_listed",
+    label: "Breaking changes are explicitly listed",
+  },
+  {
+    key: "migration_steps_present",
+    label: "Migration steps are present when required",
+  },
+  {
+    key: "links_attached",
+    label: "Relevant links to PRs and tickets are attached",
+  },
+  {
+    key: "risks_rollout_reviewed",
+    label: "Risk, rollout, and rollback were reviewed",
+  },
+  {
+    key: "grammar_checked",
+    label: "Grammar and readability were reviewed",
+  },
+] as const;
 
 export type ReleaseStatus = (typeof RELEASE_STATUSES)[number];
 export type ChangeType = (typeof CHANGE_TYPES)[number];
@@ -34,6 +74,8 @@ export type Audience = (typeof AUDIENCES)[number];
 export type DraftFormat = (typeof DRAFT_FORMATS)[number];
 export type GenerationTone = (typeof GENERATION_TONES)[number];
 export type GenerationLength = (typeof GENERATION_LENGTHS)[number];
+export type ReviewSection = (typeof REVIEW_SECTIONS)[number];
+export type ReviewChecklistItemKey = (typeof REVIEW_CHECKLIST_ITEMS)[number]["key"];
 
 export type AuditEventName =
   | "release.created"
@@ -47,7 +89,10 @@ export type AuditEventName =
   | "change.risk_updated"
   | "change.bulk_deleted"
   | "draft.generated"
-  | "draft.promoted";
+  | "draft.promoted"
+  | "review.checklist_updated"
+  | "review.comment_added"
+  | "review.comment_deleted";
 
 export interface ChangeLink {
   label: string;
@@ -84,6 +129,19 @@ export interface DraftVersion {
   createdAt: string;
 }
 
+export interface ReviewComment {
+  id: string;
+  section: ReviewSection;
+  message: string;
+  actor: "user";
+  createdAt: string;
+}
+
+export interface ReviewState {
+  checklist: Record<ReviewChecklistItemKey, boolean>;
+  comments: ReviewComment[];
+}
+
 export interface Release {
   id: string;
   name: string;
@@ -93,6 +151,7 @@ export interface Release {
   status: ReleaseStatus;
   changes: ChangeItem[];
   drafts: DraftVersion[];
+  review: ReviewState;
   primaryDraftId?: string;
   createdAt: string;
   updatedAt: string;

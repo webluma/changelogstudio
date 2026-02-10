@@ -6,6 +6,7 @@ import { useEffect, useMemo, useState } from "react";
 import { GenerateDraftModal } from "@/components/generate-draft-modal";
 import { ReleaseChangesTab } from "@/components/release-changes-tab";
 import { ReleaseDraftsTab } from "@/components/release-drafts-tab";
+import { ReleaseReviewTab } from "@/components/release-review-tab";
 import { ReleaseStatusBadge } from "@/components/release-status-badge";
 import { RELEASE_STATUSES } from "@/lib/domain/types";
 import { useAppState } from "@/lib/state/app-state";
@@ -27,7 +28,7 @@ const TAB_DESCRIPTION: Record<WorkspaceTab, string> = {
   drafts:
     "Generated and manual drafts are versioned here, with diff comparison and primary draft control.",
   review:
-    "Editorial checklist and section comments land in Phase 6.",
+    "Editorial checklist and section comments for release quality control.",
   publish:
     "Markdown/JSON exports and publish metadata land in Phase 7.",
   audit:
@@ -210,8 +211,9 @@ export default function ReleaseWorkspacePage() {
         <div className="space-y-4 p-5">
           {activeTab === "changes" ? <ReleaseChangesTab release={release} /> : null}
           {activeTab === "drafts" ? <ReleaseDraftsTab release={release} /> : null}
+          {activeTab === "review" ? <ReleaseReviewTab release={release} /> : null}
 
-          {activeTab === "review" || activeTab === "publish" ? (
+          {activeTab === "publish" ? (
             <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
               <h3 className="text-sm font-semibold uppercase tracking-[0.12em] text-slate-500">
                 {TAB_OPTIONS.find((tab) => tab.id === activeTab)?.label}
@@ -238,7 +240,7 @@ export default function ReleaseWorkspacePage() {
             </div>
           ) : null}
 
-          {activeTab === "review" || activeTab === "publish" ? (
+          {activeTab === "publish" ? (
             <div className="rounded-xl border border-slate-200 bg-white p-4">
               <p className="text-sm text-slate-700">
                 Workspace health: {releases.length} release(s) currently tracked.

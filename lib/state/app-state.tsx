@@ -8,7 +8,7 @@ import {
   useMemo,
   useReducer,
 } from "react";
-import { createEmptyDatabase } from "@/lib/domain/defaults";
+import { createDefaultReviewState, createEmptyDatabase } from "@/lib/domain/defaults";
 import type {
   Audience,
   AppDatabase,
@@ -19,6 +19,9 @@ import type {
   DraftFormat,
   GenerationLength,
   GenerationTone,
+  ReviewChecklistItemKey,
+  ReviewComment,
+  ReviewSection,
   Release,
   ReleaseStatus,
 } from "@/lib/domain/types";
@@ -70,6 +73,11 @@ interface AddDraftInput {
   title?: string;
 }
 
+interface AddReviewCommentInput {
+  section: ReviewSection;
+  message: string;
+}
+
 interface AppStateValue {
   isHydrated: boolean;
   storageError?: string;
@@ -97,6 +105,13 @@ interface AppStateValue {
   bulkDeleteChanges: (releaseId: string, changeIds: string[]) => number;
   addDraft: (releaseId: string, input: AddDraftInput) => string | null;
   setPrimaryDraft: (releaseId: string, draftId: string) => boolean;
+  setReviewChecklistItem: (
+    releaseId: string,
+    itemKey: ReviewChecklistItemKey,
+    checked: boolean,
+  ) => boolean;
+  addReviewComment: (releaseId: string, input: AddReviewCommentInput) => string | null;
+  deleteReviewComment: (releaseId: string, commentId: string) => boolean;
   getReleaseById: (releaseId: string) => Release | undefined;
   logReleaseViewed: (releaseId: string) => void;
 }
@@ -176,6 +191,25 @@ type AppAction =
       type: "set_primary_draft";
       releaseId: string;
       draftId: string;
+      event: AuditEvent;
+    }
+  | {
+      type: "set_review_checklist_item";
+      releaseId: string;
+      itemKey: ReviewChecklistItemKey;
+      checked: boolean;
+      event: AuditEvent;
+    }
+  | {
+      type: "add_review_comment";
+      releaseId: string;
+      comment: ReviewComment;
+      event: AuditEvent;
+    }
+  | {
+      type: "delete_review_comment";
+      releaseId: string;
+      commentId: string;
       event: AuditEvent;
     };
 
@@ -370,6 +404,71 @@ function appStateReducer(state: AppState, action: AppAction): AppState {
           auditLog: [action.event, ...state.database.auditLog],
         },
       };
+    case "set_review_checklist_item":
+      return {
+        ...state,
+        database: {
+          ...state.database,
+          releases: state.database.releases.map((release) =>
+            release.id === action.releaseId
+              ? {
+                  ...release,
+                  review: {
+                    ...release.review,
+                    checklist: {
+                      ...release.review.checklist,
+                      [action.itemKey]: action.checked,
+                    },
+                  },
+                  updatedAt: now,
+                }
+              : release,
+          ),
+          auditLog: [action.event, ...state.database.auditLog],
+        },
+      };
+    case "add_review_comment":
+      return {
+        ...state,
+        database: {
+          ...state.database,
+          releases: state.database.releases.map((release) =>
+            release.id === action.releaseId
+              ? {
+                  ...release,
+                  review: {
+                    ...release.review,
+                    comments: [action.comment, ...release.review.comments],
+                  },
+                  updatedAt: now,
+                }
+              : release,
+          ),
+          auditLog: [action.event, ...state.database.auditLog],
+        },
+      };
+    case "delete_review_comment":
+      return {
+        ...state,
+        database: {
+          ...state.database,
+          releases: state.database.releases.map((release) =>
+            release.id === action.releaseId
+              ? {
+                  ...release,
+                  review: {
+                    ...release.review,
+                    comments: release.review.comments.filter(
+                      (comment) => comment.id !== action.commentId,
+                    ),
+                  },
+                  updatedAt: now,
+                }
+              : release,
+          ),
+          auditLog: [action.event, ...state.database.auditLog],
+        },
+      };
     case "add_audit_event":
       return {
         ...state,
@@ -411,6 +510,7 @@ function buildRelease(input: CreateReleaseInput): Release {
     status: "draft",
     changes: [],
     drafts: [],
+    review: createDefaultReviewState(),
     createdAt: now,
     updatedAt: now,
   };
@@ -454,6 +554,16 @@ function buildDraft(
     tone: input.tone,
     length: input.length,
     title: input.title,
+    createdAt: new Date().toISOString(),
+  };
+}
+
+function buildReviewComment(input: AddReviewCommentInput): ReviewComment {
+  return {
+    id: createId("rvc"),
+    section: input.section,
+    message: input.message,
+    actor: "user",
     createdAt: new Date().toISOString(),
   };
 }
@@ -511,6 +621,7 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
         name: `${existingRelease.name} (Copy)`,
         status: "draft",
         publishedAt: undefined,
+        review: createDefaultReviewState(),
         createdAt: now,
         updatedAt: now,
         changes: existingRelease.changes.map((change) => ({
@@ -784,6 +895,99 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
     [state.database.releases],
   );
 
+  const setReviewChecklistItem = useCallback(
+    (releaseId: string, itemKey: ReviewChecklistItemKey, checked: boolean) => {
+      const release = state.database.releases.find((item) => item.id === releaseId);
+      if (!release) {
+        return false;
+      }
+
+      const event = createAuditEvent({
+        event: "review.checklist_updated",
+        releaseId,
+        metadata: { itemKey, checked },
+      });
+
+      dispatch({
+        type: "set_review_checklist_item",
+        releaseId,
+        itemKey,
+        checked,
+        event,
+      });
+
+      return true;
+    },
+    [state.database.releases],
+  );
+
+  const addReviewComment = useCallback(
+    (releaseId: string, input: AddReviewCommentInput) => {
+      const release = state.database.releases.find((item) => item.id === releaseId);
+      if (!release) {
+        return null;
+      }
+
+      const message = input.message.trim();
+      if (!message) {
+        return null;
+      }
+
+      const comment = buildReviewComment({
+        ...input,
+        message,
+      });
+
+      const event = createAuditEvent({
+        event: "review.comment_added",
+        releaseId,
+        entityId: comment.id,
+        metadata: { section: comment.section },
+      });
+
+      dispatch({
+        type: "add_review_comment",
+        releaseId,
+        comment,
+        event,
+      });
+
+      return comment.id;
+    },
+    [state.database.releases],
+  );
+
+  const deleteReviewComment = useCallback(
+    (releaseId: string, commentId: string) => {
+      const release = state.database.releases.find((item) => item.id === releaseId);
+      if (!release) {
+        return false;
+      }
+
+      const existingComment = release.review.comments.find((comment) => comment.id === commentId);
+      if (!existingComment) {
+        return false;
+      }
+
+      const event = createAuditEvent({
+        event: "review.comment_deleted",
+        releaseId,
+        entityId: commentId,
+        metadata: { section: existingComment.section },
+      });
+
+      dispatch({
+        type: "delete_review_comment",
+        releaseId,
+        commentId,
+        event,
+      });
+
+      return true;
+    },
+    [state.database.releases],
+  );
+
   const getReleaseById = useCallback(
     (releaseId: string) => {
       return state.database.releases.find((release) => release.id === releaseId);
@@ -820,19 +1024,25 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
       bulkDeleteChanges,
       addDraft,
       setPrimaryDraft,
+      setReviewChecklistItem,
+      addReviewComment,
+      deleteReviewComment,
       getReleaseById,
       logReleaseViewed,
     };
   }, [
+    addReviewComment,
     addDraft,
     addChange,
     bulkDeleteChanges,
     bulkSetChangeRisk,
     bulkSetChangeScope,
     createRelease,
+    deleteReviewComment,
     duplicateRelease,
     getReleaseById,
     logReleaseViewed,
+    setReviewChecklistItem,
     setPrimaryDraft,
     setReleaseStatus,
     state.database.auditLog,

@@ -12,8 +12,8 @@ export const PROJECT_PHASES: ProjectPhase[] = [
   { number: 3, title: "Releases and changes management", status: "completed" },
   { number: 4, title: "Draft generation pipeline", status: "completed" },
   { number: 5, title: "Versioning and diff", status: "completed" },
-  { number: 6, title: "Review workflows", status: "in_progress" },
-  { number: 7, title: "Publish and export", status: "planned" },
+  { number: 6, title: "Review workflows", status: "completed" },
+  { number: 7, title: "Publish and export", status: "in_progress" },
   { number: 8, title: "Audit log and final polish", status: "planned" },
 ];
 

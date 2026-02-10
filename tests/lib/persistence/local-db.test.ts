@@ -1,5 +1,16 @@
 import { APP_STORAGE_KEY, createEmptyDatabase } from "@/lib/domain/defaults";
+import { REVIEW_CHECKLIST_ITEMS, type ReviewChecklistItemKey } from "@/lib/domain/types";
 import { loadDatabase, saveDatabase } from "@/lib/persistence/local-db";
+
+function buildChecklist(value = false): Record<ReviewChecklistItemKey, boolean> {
+  return REVIEW_CHECKLIST_ITEMS.reduce<Record<ReviewChecklistItemKey, boolean>>(
+    (accumulator, item) => {
+      accumulator[item.key] = value;
+      return accumulator;
+    },
+    {} as Record<ReviewChecklistItemKey, boolean>,
+  );
+}
 
 describe("local-db persistence", () => {
   it("returns empty db when storage has no data", () => {
@@ -45,6 +56,10 @@ describe("local-db persistence", () => {
           status: "draft",
           changes: [],
           drafts: [],
+          review: {
+            checklist: buildChecklist(false),
+            comments: [],
+          },
           createdAt: "2026-02-01T10:00:00.000Z",
           updatedAt: "2026-02-01T10:00:00.000Z",
         },
@@ -66,6 +81,33 @@ describe("local-db persistence", () => {
 
     expect(result.errorMessage).toBeUndefined();
     expect(result.data).toEqual(valid);
+  });
+
+  it("normalizes legacy releases without review state", () => {
+    const legacy = {
+      schemaVersion: 1 as const,
+      releases: [
+        {
+          id: "rel_1",
+          name: "Legacy Release",
+          versionLabel: "v0.9.9",
+          status: "draft",
+          changes: [],
+          drafts: [],
+          createdAt: "2026-02-01T10:00:00.000Z",
+          updatedAt: "2026-02-01T10:00:00.000Z",
+        },
+      ],
+      auditLog: [],
+    };
+    window.localStorage.setItem(APP_STORAGE_KEY, JSON.stringify(legacy));
+
+    const result = loadDatabase();
+
+    expect(result.errorMessage).toBeUndefined();
+    expect(result.data.releases[0].review).toBeDefined();
+    expect(Object.values(result.data.releases[0].review.checklist).every(Boolean)).toBe(false);
+    expect(result.data.releases[0].review.comments).toEqual([]);
   });
 
   it("saves database payload", () => {

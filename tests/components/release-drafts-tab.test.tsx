@@ -1,7 +1,11 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { ReleaseDraftsTab } from "@/components/release-drafts-tab";
-import type { Release } from "@/lib/domain/types";
+import {
+  REVIEW_CHECKLIST_ITEMS,
+  type Release,
+  type ReviewChecklistItemKey,
+} from "@/lib/domain/types";
 import { useAppState } from "@/lib/state/app-state";
 
 vi.mock("@/lib/state/app-state", () => ({
@@ -9,6 +13,16 @@ vi.mock("@/lib/state/app-state", () => ({
 }));
 
 const mockedUseAppState = vi.mocked(useAppState);
+
+function buildChecklist(value = false): Record<ReviewChecklistItemKey, boolean> {
+  return REVIEW_CHECKLIST_ITEMS.reduce<Record<ReviewChecklistItemKey, boolean>>(
+    (accumulator, item) => {
+      accumulator[item.key] = value;
+      return accumulator;
+    },
+    {} as Record<ReviewChecklistItemKey, boolean>,
+  );
+}
 
 function buildRelease(overrides?: Partial<Release>): Release {
   return {
@@ -18,6 +32,10 @@ function buildRelease(overrides?: Partial<Release>): Release {
     status: "draft",
     changes: [],
     drafts: [],
+    review: {
+      checklist: buildChecklist(false),
+      comments: [],
+    },
     createdAt: "2026-02-01T10:00:00.000Z",
     updatedAt: "2026-02-01T10:00:00.000Z",
     ...overrides,
@@ -40,6 +58,9 @@ function buildAppStateMock() {
     bulkDeleteChanges: vi.fn(),
     addDraft: vi.fn(),
     setPrimaryDraft: vi.fn().mockReturnValue(true),
+    setReviewChecklistItem: vi.fn().mockReturnValue(true),
+    addReviewComment: vi.fn(),
+    deleteReviewComment: vi.fn().mockReturnValue(true),
     getReleaseById: vi.fn(),
     logReleaseViewed: vi.fn(),
   };
