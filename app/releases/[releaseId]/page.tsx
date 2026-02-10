@@ -6,9 +6,12 @@ import { useEffect, useMemo, useState } from "react";
 import { GenerateDraftModal } from "@/components/generate-draft-modal";
 import { ReleaseChangesTab } from "@/components/release-changes-tab";
 import { ReleaseDraftsTab } from "@/components/release-drafts-tab";
+import { ReleasePublishTab } from "@/components/release-publish-tab";
 import { ReleaseReviewTab } from "@/components/release-review-tab";
 import { ReleaseStatusBadge } from "@/components/release-status-badge";
+import { getPublishReadiness } from "@/lib/domain/publish-readiness";
 import { RELEASE_STATUSES } from "@/lib/domain/types";
+import { getReleaseActiveDraft } from "@/lib/export/release-export";
 import { useAppState } from "@/lib/state/app-state";
 import { formatDate, formatDateWindow } from "@/lib/utils/format";
 
@@ -22,19 +25,6 @@ const TAB_OPTIONS: Array<{ id: WorkspaceTab; label: string }> = [
   { id: "audit", label: "Audit Log" },
 ];
 
-const TAB_DESCRIPTION: Record<WorkspaceTab, string> = {
-  changes:
-    "Structured change management lands in Phase 3. This tab is already wired to release metadata and status.",
-  drafts:
-    "Generated and manual drafts are versioned here, with diff comparison and primary draft control.",
-  review:
-    "Editorial checklist and section comments for release quality control.",
-  publish:
-    "Markdown/JSON exports and publish metadata land in Phase 7.",
-  audit:
-    "Audit events are already persisted. Phase 8 expands event coverage across all critical actions.",
-};
-
 export default function ReleaseWorkspacePage() {
   const params = useParams<{ releaseId: string }>();
   const releaseId = params.releaseId;
@@ -43,7 +33,15 @@ export default function ReleaseWorkspacePage() {
   const [isGenerateModalOpen, setIsGenerateModalOpen] = useState(false);
   const [workspaceNotice, setWorkspaceNotice] = useState<string | null>(null);
 
-  const { isHydrated, releases, auditLog, getReleaseById, setReleaseStatus, logReleaseViewed } =
+  const {
+    isHydrated,
+    releases,
+    auditLog,
+    getReleaseById,
+    setReleaseStatus,
+    publishRelease,
+    logReleaseViewed,
+  } =
     useAppState();
 
   const release = getReleaseById(releaseId);
@@ -100,10 +98,10 @@ export default function ReleaseWorkspacePage() {
           The requested release does not exist in this workspace.
         </p>
         <Link
-          href="/"
+          href="/workspace"
           className="mt-4 inline-flex rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-700"
         >
-          Back to releases
+          Back to workspace
         </Link>
       </section>
     );
@@ -114,6 +112,10 @@ export default function ReleaseWorkspacePage() {
   }
 
   const canGenerateDraft = release.changes.length > 0;
+  const activeDraft = getReleaseActiveDraft(release);
+  const publishReadiness = getPublishReadiness(release);
+  const canExport = Boolean(activeDraft);
+  const canPublish = publishReadiness.canPublish;
 
   return (
     <section className="page-enter space-y-6">
@@ -174,15 +176,40 @@ export default function ReleaseWorkspacePage() {
             </button>
             <button
               type="button"
-              disabled
-              className="rounded-lg border border-slate-200 bg-slate-100 px-3 py-1.5 text-xs font-medium text-slate-500"
+              onClick={() => {
+                setActiveTab("publish");
+                setWorkspaceNotice(canExport ? "Publish tab opened. Choose your export format." : null);
+              }}
+              disabled={!canExport}
+              className={`rounded-lg px-3 py-1.5 text-xs font-medium transition ${
+                canExport
+                  ? "border border-slate-300 text-slate-700 hover:bg-slate-100"
+                  : "cursor-not-allowed border border-slate-200 bg-slate-100 text-slate-500"
+              }`}
             >
               Export
             </button>
             <button
               type="button"
-              disabled
-              className="rounded-lg border border-slate-200 bg-slate-100 px-3 py-1.5 text-xs font-medium text-slate-500"
+              onClick={() => {
+                if (!canPublish) {
+                  setActiveTab("publish");
+                  setWorkspaceNotice("Publish is blocked. Resolve blockers in the Publish tab.");
+                  return;
+                }
+
+                const published = publishRelease(release.id);
+                if (published) {
+                  setActiveTab("publish");
+                  setWorkspaceNotice("Release published successfully.");
+                }
+              }}
+              disabled={!canPublish}
+              className={`rounded-lg px-3 py-1.5 text-xs font-medium transition ${
+                canPublish
+                  ? "border border-slate-900 bg-slate-900 text-white hover:bg-slate-700"
+                  : "cursor-not-allowed border border-slate-200 bg-slate-100 text-slate-500"
+              }`}
             >
               Publish
             </button>
@@ -214,12 +241,10 @@ export default function ReleaseWorkspacePage() {
           {activeTab === "review" ? <ReleaseReviewTab release={release} /> : null}
 
           {activeTab === "publish" ? (
-            <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-              <h3 className="text-sm font-semibold uppercase tracking-[0.12em] text-slate-500">
-                {TAB_OPTIONS.find((tab) => tab.id === activeTab)?.label}
-              </h3>
-              <p className="mt-2 text-sm text-slate-700">{TAB_DESCRIPTION[activeTab]}</p>
-            </div>
+            <ReleasePublishTab
+              release={release}
+              onPublished={() => setWorkspaceNotice("Release published successfully.")}
+            />
           ) : null}
 
           {activeTab === "audit" ? (

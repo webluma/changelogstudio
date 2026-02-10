@@ -81,6 +81,7 @@ export type AuditEventName =
   | "release.created"
   | "release.duplicated"
   | "release.status_changed"
+  | "release.published"
   | "release.viewed"
   | "change.added"
   | "change.updated"
@@ -92,7 +93,8 @@ export type AuditEventName =
   | "draft.promoted"
   | "review.checklist_updated"
   | "review.comment_added"
-  | "review.comment_deleted";
+  | "review.comment_deleted"
+  | "export.downloaded";
 
 export interface ChangeLink {
   label: string;

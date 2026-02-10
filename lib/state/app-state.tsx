@@ -86,6 +86,8 @@ interface AppStateValue {
   createRelease: (input: CreateReleaseInput) => string;
   duplicateRelease: (releaseId: string) => string | null;
   setReleaseStatus: (releaseId: string, status: ReleaseStatus) => void;
+  publishRelease: (releaseId: string) => boolean;
+  logExportDownloaded: (releaseId: string, format: "markdown" | "json") => void;
   addChange: (releaseId: string, input: CreateChangeInput) => string | null;
   updateChange: (
     releaseId: string,
@@ -142,6 +144,11 @@ type AppAction =
       type: "set_release_status";
       releaseId: string;
       status: ReleaseStatus;
+      event: AuditEvent;
+    }
+  | {
+      type: "publish_release";
+      releaseId: string;
       event: AuditEvent;
     }
   | {
@@ -251,8 +258,30 @@ function appStateReducer(state: AppState, action: AppAction): AppState {
                 ? {
                     ...release,
                     status: action.status,
+                    publishedAt:
+                      action.status === "published"
+                        ? (release.publishedAt ?? now)
+                        : undefined,
                     updatedAt: now,
                   }
+              : release,
+          ),
+          auditLog: [action.event, ...state.database.auditLog],
+        },
+      };
+    case "publish_release":
+      return {
+        ...state,
+        database: {
+          ...state.database,
+          releases: state.database.releases.map((release) =>
+            release.id === action.releaseId
+              ? {
+                  ...release,
+                  status: "published",
+                  publishedAt: now,
+                  updatedAt: now,
+                }
               : release,
           ),
           auditLog: [action.event, ...state.database.auditLog],
@@ -670,6 +699,34 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
     });
   }, []);
 
+  const publishRelease = useCallback(
+    (releaseId: string) => {
+      const release = state.database.releases.find((item) => item.id === releaseId);
+      if (!release) {
+        return false;
+      }
+
+      const event = createAuditEvent({
+        event: "release.published",
+        releaseId,
+        entityId: releaseId,
+        metadata: {
+          draftCount: release.drafts.length,
+          primaryDraftId: release.primaryDraftId ?? "",
+        },
+      });
+
+      dispatch({
+        type: "publish_release",
+        releaseId,
+        event,
+      });
+
+      return true;
+    },
+    [state.database.releases],
+  );
+
   const addChange = useCallback(
     (releaseId: string, input: CreateChangeInput) => {
       const release = state.database.releases.find((item) => item.id === releaseId);
@@ -1008,6 +1065,23 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
     });
   }, []);
 
+  const logExportDownloaded = useCallback(
+    (releaseId: string, format: "markdown" | "json") => {
+      const event = createAuditEvent({
+        event: "export.downloaded",
+        releaseId,
+        entityId: releaseId,
+        metadata: { format },
+      });
+
+      dispatch({
+        type: "add_audit_event",
+        event,
+      });
+    },
+    [],
+  );
+
   const value = useMemo<AppStateValue>(() => {
     return {
       isHydrated: state.isHydrated,
@@ -1017,6 +1091,8 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
       createRelease,
       duplicateRelease,
       setReleaseStatus,
+      publishRelease,
+      logExportDownloaded,
       addChange,
       updateChange,
       bulkSetChangeScope,
@@ -1040,8 +1116,10 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
     createRelease,
     deleteReviewComment,
     duplicateRelease,
+    logExportDownloaded,
     getReleaseById,
     logReleaseViewed,
+    publishRelease,
     setReviewChecklistItem,
     setPrimaryDraft,
     setReleaseStatus,

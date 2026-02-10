@@ -51,6 +51,8 @@ function buildAppStateMock() {
     createRelease: vi.fn(),
     duplicateRelease: vi.fn(),
     setReleaseStatus: vi.fn(),
+    publishRelease: vi.fn().mockReturnValue(true),
+    logExportDownloaded: vi.fn(),
     addChange: vi.fn().mockReturnValue("chg_1"),
     updateChange: vi.fn().mockReturnValue(true),
     bulkSetChangeScope: vi.fn().mockReturnValue(1),

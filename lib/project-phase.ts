@@ -13,8 +13,8 @@ export const PROJECT_PHASES: ProjectPhase[] = [
   { number: 4, title: "Draft generation pipeline", status: "completed" },
   { number: 5, title: "Versioning and diff", status: "completed" },
   { number: 6, title: "Review workflows", status: "completed" },
-  { number: 7, title: "Publish and export", status: "in_progress" },
-  { number: 8, title: "Audit log and final polish", status: "planned" },
+  { number: 7, title: "Publish and export", status: "completed" },
+  { number: 8, title: "Audit log and final polish", status: "in_progress" },
 ];
 
 export function getCurrentPhase(): ProjectPhase {
