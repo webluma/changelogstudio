@@ -959,6 +959,10 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
         return false;
       }
 
+      if (release.status === "draft") {
+        setReleaseStatus(releaseId, "in_review");
+      }
+
       const event = createAuditEvent({
         event: "review.checklist_updated",
         releaseId,
@@ -975,7 +979,7 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
 
       return true;
     },
-    [state.database.releases],
+    [setReleaseStatus, state.database.releases],
   );
 
   const addReviewComment = useCallback(
@@ -988,6 +992,10 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
       const message = input.message.trim();
       if (!message) {
         return null;
+      }
+
+      if (release.status === "draft") {
+        setReleaseStatus(releaseId, "in_review");
       }
 
       const comment = buildReviewComment({
@@ -1011,7 +1019,7 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
 
       return comment.id;
     },
-    [state.database.releases],
+    [setReleaseStatus, state.database.releases],
   );
 
   const deleteReviewComment = useCallback(
