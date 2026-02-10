@@ -6,6 +6,7 @@ import { useEffect, useMemo, useState } from "react";
 import { GenerateDraftModal } from "@/components/generate-draft-modal";
 import { ReleaseChangesTab } from "@/components/release-changes-tab";
 import { ReleaseDraftsTab } from "@/components/release-drafts-tab";
+import { ReleaseAuditTab } from "@/components/release-audit-tab";
 import { ReleasePublishTab } from "@/components/release-publish-tab";
 import { ReleaseReviewTab } from "@/components/release-review-tab";
 import { ReleaseStatusBadge } from "@/components/release-status-badge";
@@ -67,9 +68,7 @@ export default function ReleaseWorkspacePage() {
   }, [isHydrated, release, releaseId]);
 
   const releaseAuditEvents = useMemo(() => {
-    return auditLog
-      .filter((event) => event.releaseId === releaseId)
-      .slice(0, 8);
+    return auditLog.filter((event) => event.releaseId === releaseId);
   }, [auditLog, releaseId]);
 
   if (!isHydrated) {
@@ -248,21 +247,7 @@ export default function ReleaseWorkspacePage() {
           ) : null}
 
           {activeTab === "audit" ? (
-            <div className="space-y-2">
-              {releaseAuditEvents.length === 0 ? (
-                <p className="text-sm text-slate-600">No audit events for this release yet.</p>
-              ) : (
-                releaseAuditEvents.map((event) => (
-                  <div
-                    key={event.id}
-                    className="rounded-xl border border-slate-200 px-4 py-3 text-sm text-slate-700"
-                  >
-                    <p className="font-medium text-slate-900">{event.event}</p>
-                    <p className="text-xs text-slate-500">{formatDate(event.timestamp)}</p>
-                  </div>
-                ))
-              )}
-            </div>
+            <ReleaseAuditTab events={releaseAuditEvents} />
           ) : null}
 
           {activeTab === "publish" ? (
